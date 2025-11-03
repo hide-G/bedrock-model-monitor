@@ -1,0 +1,71 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Bedrock Model Monitor - 新モデルリリース通知システム
+
+Parameters:
+  EmailAddress:
+    Type: String
+    Description: Email address for notifications
+
+Globals:
+  Function:
+    Timeout: 60
+    Runtime: nodejs20.x
+    Architectures:
+      - arm64
+
+Resources:
+  # DynamoDB: モデル一覧を保存
+  ModelsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub ${AWS::StackName}-models
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: modelId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: modelId
+          KeyType: HASH
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+
+  # Lambda関数
+  MonitorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/
+      Handler: index.handler
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref ModelsTable
+          EMAIL_ADDRESS: !Ref EmailAddress
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ModelsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:ListFoundationModels
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - ses:SendEmail
+              Resource: '*'
+      Events:
+        ScheduleEvent:
+          Type: Schedule
+          Properties:
+            Schedule: rate(10 minutes)
+            Description: 10分毎にBedrockモデルをチェック
+
+Outputs:
+  FunctionName:
+    Description: Lambda関数名
+    Value: !Ref MonitorFunction
+  TableName:
+    Description: DynamoDBテーブル名
+    Value: !Ref ModelsTable
+  EmailAddress:
+    Description: 通知先メールアドレス
+    Value: !Ref EmailAddress

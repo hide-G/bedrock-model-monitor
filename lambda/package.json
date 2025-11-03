@@ -1,0 +1,12 @@
+{
+  "name": "bedrock-model-monitor",
+  "version": "1.0.0",
+  "description": "Monitor new Bedrock models and send email notifications",
+  "main": "index.js",
+  "dependencies": {
+    "@aws-sdk/client-bedrock": "^3.700.0",
+    "@aws-sdk/client-dynamodb": "^3.700.0",
+    "@aws-sdk/lib-dynamodb": "^3.700.0",
+    "@aws-sdk/client-ses": "^3.700.0"
+  }
+}

@@ -1,0 +1,26 @@
+# SAM
+.aws-sam/
+samconfig.toml
+
+# Node
+node_modules/
+lambda/node_modules/
+package-lock.json
+lambda/package-lock.json
+
+# Test files
+response.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
