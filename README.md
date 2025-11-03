@@ -1,5 +1,7 @@
 # Bedrock Model Monitor
 
+[![Built with Kiro](https://img.shields.io/badge/Built%20with-Kiro-blue)](https://kiro.ai)
+
 [English](#english) | [日本語](#japanese)
 
 ---
@@ -7,6 +9,8 @@
 ## English
 
 Monitor Amazon Bedrock for new foundation models and get instant email notifications when they're released.
+
+> **Note**: This project was developed using [Kiro](https://kiro.ai), an AI-powered IDE for developers.
 
 ### Features
 
@@ -138,6 +142,8 @@ MIT
 ## Japanese
 
 Amazon Bedrockの新しい基盤モデルを監視し、リリースされたら即座にメール通知を受け取るシステムです。
+
+> **注記**: このプロジェクトは、AI搭載の開発環境 [Kiro](https://kiro.ai) を使用して開発されました。
 
 ### 機能
 
