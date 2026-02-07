@@ -20,7 +20,7 @@ Amazon Bedrock frequently adds new generative AI models, but there's no built-in
 
 ### One-Click Deploy (Launch Stack)
 
-[![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=bedrock-model-monitor&templateURL=https://YOUR_BUCKET.s3.amazonaws.com/bedrock-model-monitor/template.yaml)
+[![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=bedrock-model-monitor&templateURL=https://bedrock-model-monitor-launch.s3.amazonaws.com/launch-stack.yaml)
 
 > After clicking, you'll be prompted to enter your email address. Two confirmation emails will arrive — click both links to activate notifications.
 >
@@ -187,25 +187,21 @@ sam build && sam deploy --parameter-overrides EmailAddress=you@example.com
 
 > Launch Stack deployment requires **no prerequisites** — just an AWS account.
 
-### Launch Stack Setup (for repository maintainers)
+### Launch Stack Setup (for forks)
 
-To enable the one-click Launch Stack button for your fork:
+If you fork this repository and want your own Launch Stack button:
 
-1. Create an S3 bucket and package the template:
+1. Create a public S3 bucket and upload `launch-stack.yaml`:
    ```bash
-   aws s3 mb s3://your-template-bucket
-   sam build
-   sam package --output-template-file packaged.yaml \
-     --s3-bucket your-template-bucket --s3-prefix bedrock-model-monitor
-   aws s3 cp packaged.yaml \
-     s3://your-template-bucket/bedrock-model-monitor/template.yaml
-   aws s3api put-object-acl --bucket your-template-bucket \
-     --key bedrock-model-monitor/template.yaml --acl public-read
+   aws s3 mb s3://your-bucket-name
+   aws s3api put-public-access-block --bucket your-bucket-name \
+     --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
+   aws s3 cp launch-stack.yaml s3://your-bucket-name/launch-stack.yaml
    ```
 
-2. Update the Launch Stack URL in this README with your bucket name.
+2. Add a public-read bucket policy (see `bucket-policy.json` for reference).
 
-**Automated:** Configure `TEMPLATE_BUCKET_NAME` and `AWS_ROLE_ARN` in GitHub Secrets, then push a version tag (`v1.0.0`).
+3. Update the Launch Stack URLs in this README with your bucket name.
 
 ### Cost Estimate
 
@@ -241,7 +237,7 @@ Amazon Bedrockには新しいモデルが頻繁に追加されますが、リリ
 
 ### ワンクリックデプロイ（Launch Stack）
 
-[![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=bedrock-model-monitor&templateURL=https://YOUR_BUCKET.s3.amazonaws.com/bedrock-model-monitor/template.yaml)
+[![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/create/review?stackName=bedrock-model-monitor&templateURL=https://bedrock-model-monitor-launch.s3.amazonaws.com/launch-stack.yaml)
 
 > ボタンを押すとメールアドレスの入力画面が表示されます。デプロイ後、2通の確認メール（SES検証・SNSサブスクリプション）が届くので、両方のリンクをクリックしてください。
 >

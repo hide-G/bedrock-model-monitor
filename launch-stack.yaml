@@ -1,0 +1,244 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Bedrock Model Monitor - One-Click Deployment.
+  Detects new Amazon Bedrock models across all AWS regions
+  and sends bilingual (EN/JP) notifications.
+  This template uses CodeBuild to automatically build and deploy the application.
+  S3 bucket creation, SAM build, and SAM deploy are all automated.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Notification Settings / 通知設定
+        Parameters:
+          - EmailAddress
+      - Label:
+          default: Monitor Settings / 監視設定
+        Parameters:
+          - CheckIntervalMinutes
+    ParameterLabels:
+      EmailAddress:
+        default: Notification Email Address / 通知先メールアドレス
+      CheckIntervalMinutes:
+        default: Check Interval (minutes) / チェック間隔（分）
+
+Parameters:
+  EmailAddress:
+    Type: String
+    Description: >
+      Email address for notifications. Verification emails will be sent after deployment.
+      通知先メールアドレス。デプロイ後に検証メールが届きます。
+    AllowedPattern: '.+@.+\..+'
+    ConstraintDescription: Please enter a valid email address / 有効なメールアドレスを入力してください
+  CheckIntervalMinutes:
+    Type: Number
+    Default: 3
+    MinValue: 1
+    MaxValue: 1440
+    Description: >
+      How often to check for new models (minutes). Default: 3 minutes.
+      新モデルのチェック間隔（分）。デフォルト: 3分。
+
+Resources:
+  # デプロイ開始・完了通知用SNS Topic
+  DeployNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: Bedrock Model Monitor - Deploy Notification
+
+  DeployNotificationSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref DeployNotificationTopic
+      Protocol: email
+      Endpoint: !Ref EmailAddress
+
+  # CodeBuild用IAMロール
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
+  # CodeBuildプロジェクト: GitHubからクローン → npm install → sam build → sam deploy
+  DeployProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub ${AWS::StackName}-deploy
+      Description: >
+        Automatically build and deploy Bedrock Model Monitor.
+        GitHubからクローンし、SAMでビルド＆デプロイを自動実行します。
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      TimeoutInMinutes: 30
+      Source:
+        Type: NO_SOURCE
+        BuildSpec: !Sub |
+          version: 0.2
+          env:
+            variables:
+              APP_STACK_NAME: "bedrock-model-monitor-app"
+          phases:
+            install:
+              runtime-versions:
+                nodejs: 20
+                python: 3.12
+              commands:
+                - echo "=== [1/4] Installing SAM CLI ==="
+                - pip install --quiet aws-sam-cli
+                - sam --version
+            pre_build:
+              commands:
+                - echo "=== [2/4] Cloning repository and installing dependencies ==="
+                - git clone --depth 1 https://github.com/hide-G/bedrock-model-monitor.git app
+                - cd app/lambda && npm ci --production && cd ../..
+                - |
+                  aws sns publish \
+                    --topic-arn "${DeployNotificationTopic}" \
+                    --subject "Bedrock Model Monitor - Deploy Started / デプロイ開始" \
+                    --message "Deployment has started. This takes about 5 minutes. You will receive another email when it completes. デプロイを開始しました。約5分で完了します。完了時に再度メールが届きます。" \
+                    || true
+            build:
+              commands:
+                - echo "=== [3/4] SAM Build & Deploy ==="
+                - cd app
+                - sam build
+                - |
+                  sam deploy \
+                    --stack-name $APP_STACK_NAME \
+                    --capabilities CAPABILITY_IAM \
+                    --resolve-s3 \
+                    --no-confirm-changeset \
+                    --no-fail-on-empty-changeset \
+                    --parameter-overrides \
+                      EmailAddress=${EmailAddress} \
+                      CheckIntervalMinutes=${CheckIntervalMinutes}
+            post_build:
+              commands:
+                - echo "=== [4/4] Deploy Complete ==="
+                - |
+                  aws sns publish \
+                    --topic-arn "${DeployNotificationTopic}" \
+                    --subject "Bedrock Model Monitor - Deploy Complete! / デプロイ完了" \
+                    --message "Deployment completed successfully! Next steps: 1) Click the SES verification link in your inbox. 2) Click the SNS subscription confirmation link. The monitor will start checking every ${CheckIntervalMinutes} minutes. --- デプロイが完了しました！次の手順: 1) 受信トレイのSES検証リンクをクリック 2) SNSサブスクリプション確認リンクをクリック ${CheckIntervalMinutes}分毎にBedrockモデルのチェックが開始されます。" \
+                    || true
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+      Artifacts:
+        Type: NO_ARTIFACTS
+
+  # CodeBuildを自動キックするLambda用IAMロール
+  TriggerFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: StartCodeBuild
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - codebuild:StartBuild
+                Resource: !GetAtt DeployProject.Arn
+
+  # Custom Resource用Lambda: スタック作成時にCodeBuildを自動キック
+  TriggerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Runtime: python3.12
+      Handler: index.handler
+      Timeout: 60
+      Role: !GetAtt TriggerFunctionRole.Arn
+      Environment:
+        Variables:
+          PROJECT_NAME: !Ref DeployProject
+      Code:
+        ZipFile: |
+          import boto3
+          import json
+          import urllib.request
+          import os
+
+          def handler(event, context):
+              """CloudFormation Custom Resource: CodeBuildプロジェクトを自動キック"""
+              print(json.dumps(event))
+              response_data = {}
+              try:
+                  if event.get('RequestType') in ('Create', 'Update'):
+                      client = boto3.client('codebuild')
+                      resp = client.start_build(projectName=os.environ['PROJECT_NAME'])
+                      build_id = resp['build']['id']
+                      print(f'CodeBuild開始: {build_id}')
+                      response_data['BuildId'] = build_id
+                  send_cfn_response(event, context, 'SUCCESS', response_data)
+              except Exception as e:
+                  print(f'エラー: {e}')
+                  send_cfn_response(event, context, 'FAILED', {'Error': str(e)})
+
+          def send_cfn_response(event, context, status, data):
+              body = json.dumps({
+                  'Status': status,
+                  'Reason': f'See CloudWatch Logs: {context.log_group_name}',
+                  'PhysicalResourceId': context.log_stream_name,
+                  'StackId': event['StackId'],
+                  'RequestId': event['RequestId'],
+                  'LogicalResourceId': event['LogicalResourceId'],
+                  'Data': data
+              })
+              req = urllib.request.Request(
+                  event['ResponseURL'],
+                  data=body.encode('utf-8'),
+                  headers={'Content-Type': ''},
+                  method='PUT'
+              )
+              urllib.request.urlopen(req)
+
+  # Custom Resource: スタック作成時にCodeBuildを自動キック
+  TriggerDeploy:
+    Type: Custom::TriggerDeploy
+    DependsOn:
+      - DeployProject
+    Properties:
+      ServiceToken: !GetAtt TriggerFunction.Arn
+
+Outputs:
+  Status:
+    Description: Deployment status / デプロイ状況
+    Value: !Sub >
+      CodeBuild is building and deploying the application automatically.
+      You will receive email notifications at ${EmailAddress} when deployment starts and completes.
+      CodeBuildがアプリケーションを自動ビルド＆デプロイ中です。
+      デプロイの開始・完了時に ${EmailAddress} にメール通知が届きます。
+  NextSteps:
+    Description: Next steps / 次の手順
+    Value: !Sub >
+      1. Wait for the "Deploy Complete" email (about 5 minutes).
+      2. Click the SES verification link sent to ${EmailAddress}.
+      3. Click the SNS subscription confirmation link sent to ${EmailAddress}.
+      4. The monitor will check Bedrock models every ${CheckIntervalMinutes} minutes.
+      ---
+      1.「デプロイ完了」メールを待ちます（約5分）。
+      2. ${EmailAddress} に届くSES検証メールのリンクをクリック。
+      3. ${EmailAddress} に届くSNSサブスクリプション確認メールのリンクをクリック。
+      4. ${CheckIntervalMinutes}分毎にBedrockモデルのチェックが開始されます。
+  CodeBuildProject:
+    Description: CodeBuild Project (for troubleshooting)
+    Value: !Sub https://${AWS::Region}.console.aws.amazon.com/codesuite/codebuild/projects/${DeployProject}/build-history

@@ -1,0 +1,38 @@
+name: Launch Stackテンプレートを S3 に自動公開
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'launch-stack.yaml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  TEMPLATE_BUCKET: bedrock-model-monitor-launch
+  AWS_REGION: us-east-1
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # OIDC認証（推奨）またはアクセスキー認証
+      # リポジトリのSecretsに AWS_ROLE_ARN を設定してください
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: launch-stack.yaml を S3 にアップロード
+        run: |
+          aws s3 cp launch-stack.yaml \
+            s3://${{ env.TEMPLATE_BUCKET }}/launch-stack.yaml \
+            --content-type "application/x-yaml"
+          echo "✅ アップロード完了"
+          echo "URL: https://${{ env.TEMPLATE_BUCKET }}.s3.amazonaws.com/launch-stack.yaml"
