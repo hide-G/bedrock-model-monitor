@@ -10,35 +10,31 @@ Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label:
-          default: Notification Settings / 通知設定
+          default: Notification Settings
         Parameters:
           - EmailAddress
       - Label:
-          default: Monitor Settings / 監視設定
+          default: Monitor Settings
         Parameters:
           - CheckIntervalMinutes
     ParameterLabels:
       EmailAddress:
-        default: Notification Email Address / 通知先メールアドレス
+        default: Notification Email Address
       CheckIntervalMinutes:
-        default: Check Interval (minutes) / チェック間隔（分）
+        default: Check Interval (minutes)
 
 Parameters:
   EmailAddress:
     Type: String
-    Description: >
-      Email address for notifications. Verification emails will be sent after deployment.
-      通知先メールアドレス。デプロイ後に検証メールが届きます。
+    Description: Email address for notifications. Verification emails will be sent after deployment.
     AllowedPattern: '.+@.+\..+'
-    ConstraintDescription: Please enter a valid email address / 有効なメールアドレスを入力してください
+    ConstraintDescription: Please enter a valid email address.
   CheckIntervalMinutes:
     Type: Number
     Default: 3
     MinValue: 1
     MaxValue: 1440
-    Description: >
-      How often to check for new models (minutes). Default: 3 minutes.
-      新モデルのチェック間隔（分）。デフォルト: 3分。
+    Description: How often to check for new models (minutes). Default 3 minutes.
 
 Resources:
   # デプロイ開始・完了通知用SNS Topic
