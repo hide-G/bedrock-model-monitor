@@ -155,12 +155,11 @@ The SNS Topic ARN is available in the CloudFormation Outputs after deployment.
 
 ### Deploy with SAM CLI (Alternative)
 
-```bash
-# ビルド＆デプロイ（対話形式）
-sam build && sam deploy --guided
+If you prefer CLI deployment over Launch Stack:
 
-# または直接指定
-sam build && sam deploy --parameter-overrides EmailAddress=you@example.com
+```bash
+cd lambda && npm install && cd ..
+sam build && sam deploy --guided
 ```
 
 ### Parameters
@@ -178,30 +177,6 @@ sam build && sam deploy --parameter-overrides EmailAddress=you@example.com
 | `.\test-local.ps1` | Run Lambda locally for development |
 | `.\update-email.ps1` | Update notification email address |
 | `.\destroy.ps1` | Delete all AWS resources |
-
-### Prerequisites (SAM CLI deploy only)
-
-- AWS CLI configured
-- AWS SAM CLI installed
-- Node.js 20.x+
-
-> Launch Stack deployment requires **no prerequisites** — just an AWS account.
-
-### Launch Stack Setup (for forks)
-
-If you fork this repository and want your own Launch Stack button:
-
-1. Create a public S3 bucket and upload `launch-stack.yaml`:
-   ```bash
-   aws s3 mb s3://your-bucket-name
-   aws s3api put-public-access-block --bucket your-bucket-name \
-     --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
-   aws s3 cp launch-stack.yaml s3://your-bucket-name/launch-stack.yaml
-   ```
-
-2. Add a public-read bucket policy (see `bucket-policy.json` for reference).
-
-3. Update the Launch Stack URLs in this README with your bucket name.
 
 ### Cost Estimate
 
@@ -299,7 +274,10 @@ SNS Topic ARNはデプロイ後のCloudFormation Outputsで確認できます。
 
 ### SAM CLIでデプロイ（代替方法）
 
+Launch Stackの代わりにCLIでデプロイする場合：
+
 ```bash
+cd lambda && npm install && cd ..
 sam build && sam deploy --guided
 ```
 
