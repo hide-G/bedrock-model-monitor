@@ -94,7 +94,7 @@ Resources:
               commands:
                 - echo "=== [2/4] Cloning repository and installing dependencies ==="
                 - git clone --depth 1 https://github.com/hide-G/bedrock-model-monitor.git app
-                - cd app/lambda && npm ci --production && cd ../..
+                - cd app/lambda && npm install --omit=dev && cd ../..
                 - |
                   aws sns publish \
                     --topic-arn "${DeployNotificationTopic}" \
