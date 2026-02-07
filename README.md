@@ -23,6 +23,10 @@ Amazon Bedrock frequently adds new generative AI models, but there's no built-in
 [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=bedrock-model-monitor&templateURL=https://YOUR_BUCKET.s3.amazonaws.com/bedrock-model-monitor/template.yaml)
 
 > After clicking, you'll be prompted to enter your email address. Two confirmation emails will arrive — click both links to activate notifications.
+>
+> The stack will be deployed to **whichever AWS region you currently have selected** in the AWS Console. The monitor works from any region — it dynamically scans all regions regardless of where it's deployed.
+>
+> **SES Sandbox Note:** New AWS accounts have SES in sandbox mode, which only allows sending emails to verified addresses. Since this tool sends notifications to the same address you verify during setup, it works fine in sandbox mode. No need to request production access.
 
 ### Architecture
 
@@ -240,6 +244,10 @@ Amazon Bedrockには新しいモデルが頻繁に追加されますが、リリ
 [![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=bedrock-model-monitor&templateURL=https://YOUR_BUCKET.s3.amazonaws.com/bedrock-model-monitor/template.yaml)
 
 > ボタンを押すとメールアドレスの入力画面が表示されます。デプロイ後、2通の確認メール（SES検証・SNSサブスクリプション）が届くので、両方のリンクをクリックしてください。
+>
+> スタックは**AWSコンソールで現在選択しているリージョン**にデプロイされます。どのリージョンにデプロイしても、全AWSリージョンのBedrockモデルを動的にスキャンするため、監視範囲に影響はありません。
+>
+> **SESサンドボックスについて:** 新しいAWSアカウントではSESがサンドボックスモードになっており、検証済みアドレスにのみメール送信が可能です。このツールはセットアップ時に検証した同じアドレスに通知を送るため、サンドボックスモードのままで問題なく動作します。本番アクセスの申請は不要です。
 
 ### アーキテクチャ
 
