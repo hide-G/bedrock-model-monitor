@@ -1,6 +1,6 @@
 # Bedrock Model Monitor
 
-[![Built with Kiro](https://img.shields.io/badge/Built%20with-Kiro-blue)](https://kiro.ai)
+> Detect new Amazon Bedrock foundation models across **all AWS regions** and get instant bilingual (English/Japanese) notifications — with one-click deployment.
 
 [English](#english) | [日本語](#japanese)
 
@@ -8,130 +8,214 @@
 
 ## English
 
-Monitor Amazon Bedrock for new foundation models and get instant email notifications when they're released.
+### Why Bedrock Model Monitor?
 
-> **Note**: This project was developed using [Kiro](https://kiro.ai), an AI-powered IDE for developers.
+Amazon Bedrock frequently adds new generative AI models, but there's no built-in notification when a new model becomes available. This tool solves that by:
 
-### Features
+- Scanning **every AWS region dynamically** (no hardcoded region list)
+- Detecting new models within **3 minutes** of release
+- Telling you **exactly which regions** each model is available in
+- Sending **bilingual notifications** (English + Japanese) with direct console links
+- Deploying in **one click** — no CLI, no CDK, no bootstrap required
 
-- 🔍 Checks Bedrock every 10 minutes for new models
-- 📧 Email notifications with detailed model information
-- 💾 Tracks known models in DynamoDB
-- ⚡ Serverless architecture (Lambda + EventBridge)
-- 💰 Low cost (mostly free tier eligible)
+### One-Click Deploy (Launch Stack)
+
+[![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=bedrock-model-monitor&templateURL=https://YOUR_BUCKET.s3.amazonaws.com/bedrock-model-monitor/template.yaml)
+
+> After clicking, you'll be prompted to enter your email address. Two confirmation emails will arrive — click both links to activate notifications.
 
 ### Architecture
 
-- **Lambda**: Fetches model list from Bedrock API and compares with DynamoDB
-- **DynamoDB**: Stores known models
-- **EventBridge**: Triggers Lambda every 10 minutes
-- **SES**: Sends email notifications for new models
-
-### Prerequisites
-
-- AWS CLI configured with credentials
-- AWS SAM CLI installed
-- Node.js 20.x or later
-- An email address for notifications
-
-### Tested Environment
-
-- Windows 10
-- PowerShell 5.1+
-- AWS CLI 2.x
-- AWS SAM CLI 1.144.0+
-- Node.js 20.x
-
-### Quick Start
-
-#### Deploy
-
-**Windows PowerShell:**
-```powershell
-.\deploy.ps1
+```
+EventBridge Scheduler (every 3 min)
+        │
+        ▼
+  Lambda Function (Node.js 20)
+        ├── EC2 DescribeRegions (get ALL AWS regions dynamically)
+        ├── Bedrock ListFoundationModels (parallel across all regions)
+        ├── DynamoDB (diff detection)
+        └── New model found?
+              ├── Yes → SES Email (bilingual EN/JP with docs links)
+              │         SNS Topic (JSON payload for Slack/Teams/Lambda)
+              └── No  → Done
 ```
 
-**Linux/Mac:**
-```bash
-chmod +x deploy.sh
-./deploy.sh
-```
+| Component | Role |
+|-----------|------|
+| Lambda | Scans all AWS regions for Bedrock models, compares with DynamoDB |
+| DynamoDB | Stores known models with region availability |
+| EventBridge | Triggers Lambda on schedule (default: every 3 minutes) |
+| SES | Sends bilingual email notifications with documentation links |
+| SNS Topic | Publishes structured JSON for Slack/Teams/Lambda integrations |
 
-The script will:
-1. Prompt for your email address
-2. Verify the email with AWS SES (check your inbox)
-3. Build and deploy the stack
+### Key Differentiators
 
-#### First Run
-
-On first deployment, you'll receive an email with all currently available Bedrock models (~105 models).
-After that, you'll only be notified of new models.
-
-### Management Commands
-
-**Update Email Address:**
-```powershell
-.\update-email.ps1
-```
-
-**Test Immediately (AWS):**
-```powershell
-.\test-now.ps1
-```
-Triggers the deployed Lambda function on AWS and sends a real email notification.
-
-**Test Locally (Development):**
-```powershell
-.\test-local.ps1
-```
-Runs the Lambda function code locally without deploying. Useful for testing code changes before deployment.
-
-**View Logs:**
-```powershell
-aws logs tail /aws/lambda/bedrock-model-monitor-MonitorFunction --follow
-```
-
-**Delete Everything:**
-```powershell
-.\destroy.ps1
-```
-
-### Cost Estimate
-
-- **Lambda**: ~4,320 invocations/month - Free tier covers 1M requests
-- **DynamoDB**: On-demand pricing - Minimal cost for small dataset
-- **SES**: First 62,000 emails/month free
-- **EventBridge**: First 14M events/month free
-
-**Estimated monthly cost: $0-1**
+| Feature | Bedrock Model Monitor | Typical Alternatives |
+|---------|----------------------|---------------------|
+| Region Coverage | **All AWS regions (dynamic)** | 3 regions (hardcoded) |
+| Detection Speed | **3 minutes** (configurable) | 1-10 minutes |
+| Language | **Bilingual (EN + JP)** | Single language |
+| Deployment | **One-click (Launch Stack)** | CDK + bootstrap required |
+| External Dependencies | **None** | Tavily API key, etc. |
+| Slack/Teams Ready | **SNS Topic included** | Manual setup |
+| Documentation Links | **Auto-included** | Not included |
+| Cost | **$0-1/month** | Varies (AgentCore costs) |
 
 ### Email Notification Example
 
 ```
-Amazon Bedrockに新しいモデルがリリースされました！
+[English]
+New generative AI model(s) have been released on Amazon Bedrock!
 
-検出日時: 2025-11-04 10:30:00
-新モデル数: 3
+Detection Time: 2/7/2026, 10:30:00 AM (UTC)
+New Models: 2
+Bedrock Available Regions: 18
 
-【新モデル一覧】
-- GPT-4o (openai.gpt-4o-v1:0)
-  Provider: OpenAI
-  Input: TEXT
+--- New Model Details ---
+
+■ Claude 4 Opus is now available in 5 region(s).
+  Model ID: anthropic.claude-4-opus-v1:0
+  Provider: Anthropic
+  Input: TEXT, IMAGE
   Output: TEXT
   Streaming: Yes
+  Console: https://console.aws.amazon.com/bedrock/home?region=us-east-1#/models
+  Regions:
+    - us-east-1 (US East (N. Virginia))
+    - us-west-2 (US West (Oregon))
+    - eu-west-1 (Europe (Ireland))
+    - ap-northeast-1 (Asia Pacific (Tokyo))
+    - ap-southeast-1 (Asia Pacific (Singapore))
+
+📖 Full Model List: https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html
+💰 Pricing: https://aws.amazon.com/bedrock/pricing/
+
+---
+
+[日本語]
+Amazon Bedrockに新しい生成AIモデルがリリースされました！
+
+検出日時: 2026/2/7 19:30:00 (JST)
+新モデル数: 2
+Bedrock利用可能リージョン数: 18
+
+--- 新モデル詳細 ---
+
+■ 5個のリージョンで Claude 4 Opus が使えるようになりました。
+  モデルID: anthropic.claude-4-opus-v1:0
+  プロバイダー: Anthropic
+  入力: TEXT, IMAGE
+  出力: TEXT
+  ストリーミング: 対応
+  コンソール: https://console.aws.amazon.com/bedrock/home?region=us-east-1#/models
+  リージョン詳細:
+    - us-east-1 (US East (N. Virginia))
+    - us-west-2 (US West (Oregon))
+    - eu-west-1 (Europe (Ireland))
+    - ap-northeast-1 (Asia Pacific (Tokyo))
+    - ap-southeast-1 (Asia Pacific (Singapore))
+
+📖 対応モデル一覧: https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html
+💰 料金: https://aws.amazon.com/bedrock/pricing/
 ```
 
-### Troubleshooting
+### SNS Integration (Slack / Teams / Lambda)
 
-**Email not verified:**
-Check your inbox for AWS SES verification email and click the link.
+The stack creates an SNS Topic that publishes structured JSON when new models are detected. You can subscribe:
 
-**No notifications:**
-- Check Lambda logs
-- Verify EventBridge rule is enabled in AWS Console
+- **Slack**: Use AWS Chatbot or a Lambda function with Slack Incoming Webhook
+- **Microsoft Teams**: Use a Lambda function with Teams Incoming Webhook
+- **Custom Lambda**: Process the JSON payload for any custom workflow
 
-**Permission errors:**
-Ensure your AWS credentials have permissions for Lambda, DynamoDB, SES, EventBridge, and CloudFormation.
+SNS JSON payload example:
+```json
+{
+  "source": "bedrock-model-monitor",
+  "detectedAt": "2026-02-07T10:30:00.000Z",
+  "bedrockRegionCount": 18,
+  "newModelCount": 1,
+  "models": [
+    {
+      "modelId": "anthropic.claude-4-opus-v1:0",
+      "modelName": "Claude 4 Opus",
+      "providerName": "Anthropic",
+      "regionCount": 5,
+      "regions": ["us-east-1", "us-west-2", "eu-west-1", "ap-northeast-1", "ap-southeast-1"],
+      "docsUrl": "https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html",
+      "consoleUrl": "https://console.aws.amazon.com/bedrock/home?region=us-east-1#/models"
+    }
+  ],
+  "summary": "🆕 Claude 4 Opus (Anthropic) - 5 region(s): us-east-1, us-west-2, eu-west-1, ap-northeast-1, ap-southeast-1"
+}
+```
+
+The SNS Topic ARN is available in the CloudFormation Outputs after deployment.
+
+### Deploy with SAM CLI (Alternative)
+
+```bash
+# ビルド＆デプロイ（対話形式）
+sam build && sam deploy --guided
+
+# または直接指定
+sam build && sam deploy --parameter-overrides EmailAddress=you@example.com
+```
+
+### Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| EmailAddress | *(required)* | Email for notifications (SES verification sent automatically) |
+| CheckIntervalMinutes | 3 | Check interval in minutes (1-1440) |
+
+### Management Commands (PowerShell)
+
+| Command | Description |
+|---------|-------------|
+| `.\test-now.ps1` | Trigger Lambda on AWS (sends real notification) |
+| `.\test-local.ps1` | Run Lambda locally for development |
+| `.\update-email.ps1` | Update notification email address |
+| `.\destroy.ps1` | Delete all AWS resources |
+
+### Prerequisites (SAM CLI deploy only)
+
+- AWS CLI configured
+- AWS SAM CLI installed
+- Node.js 20.x+
+
+> Launch Stack deployment requires **no prerequisites** — just an AWS account.
+
+### Launch Stack Setup (for repository maintainers)
+
+To enable the one-click Launch Stack button for your fork:
+
+1. Create an S3 bucket and package the template:
+   ```bash
+   aws s3 mb s3://your-template-bucket
+   sam build
+   sam package --output-template-file packaged.yaml \
+     --s3-bucket your-template-bucket --s3-prefix bedrock-model-monitor
+   aws s3 cp packaged.yaml \
+     s3://your-template-bucket/bedrock-model-monitor/template.yaml
+   aws s3api put-object-acl --bucket your-template-bucket \
+     --key bedrock-model-monitor/template.yaml --acl public-read
+   ```
+
+2. Update the Launch Stack URL in this README with your bucket name.
+
+**Automated:** Configure `TEMPLATE_BUCKET_NAME` and `AWS_ROLE_ARN` in GitHub Secrets, then push a version tag (`v1.0.0`).
+
+### Cost Estimate
+
+| Service | Usage | Cost |
+|---------|-------|------|
+| Lambda | ~14,400 invocations/month (3-min interval) | Free tier (1M requests) |
+| DynamoDB | On-demand, small dataset | Minimal |
+| SES | Email notifications | Free (first 62,000/month) |
+| SNS | Topic notifications | Free (first 1M publishes) |
+| EventBridge | Scheduled events | Free (first 14M/month) |
+
+**Estimated monthly cost: $0-1**
 
 ### License
 
@@ -141,130 +225,104 @@ MIT
 
 ## Japanese
 
-Amazon Bedrockの新しい基盤モデルを監視し、リリースされたら即座にメール通知を受け取るシステムです。
+> Amazon Bedrockの新しい生成AIモデルを**全AWSリージョン横断**で自動検知し、リージョン情報付きのバイリンガル通知（英語・日本語）を即座に受け取れるサーバーレスアプリケーションです。ワンクリックでデプロイできます。
 
-> **注記**: このプロジェクトは、AI搭載の開発環境 [Kiro](https://kiro.ai) を使用して開発されました。
+### なぜ Bedrock Model Monitor？
 
-### 機能
+Amazon Bedrockには新しいモデルが頻繁に追加されますが、リリース通知の仕組みはありません。このツールは:
 
-- 🔍 10分毎にBedrockの新モデルをチェック
-- 📧 詳細なモデル情報をメールで通知
-- 💾 既知のモデルをDynamoDBで管理
-- ⚡ サーバーレスアーキテクチャ（Lambda + EventBridge）
-- 💰 低コスト（ほぼ無料枠内で運用可能）
+- **全AWSリージョンを動的にスキャン**（ハードコードなし、新リージョン自動対応）
+- リリースから**3分以内**に検出
+- 各モデルが**どのリージョンで利用可能か**を正確に通知
+- **英語＋日本語のバイリンガル通知**にドキュメントリンク付き
+- **ワンクリックデプロイ** — CLI不要、CDK不要、bootstrap不要
+
+### ワンクリックデプロイ（Launch Stack）
+
+[![Launch Stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=bedrock-model-monitor&templateURL=https://YOUR_BUCKET.s3.amazonaws.com/bedrock-model-monitor/template.yaml)
+
+> ボタンを押すとメールアドレスの入力画面が表示されます。デプロイ後、2通の確認メール（SES検証・SNSサブスクリプション）が届くので、両方のリンクをクリックしてください。
 
 ### アーキテクチャ
 
-- **Lambda**: Bedrock APIからモデル一覧を取得し、DynamoDBと比較
-- **DynamoDB**: 既知のモデルを保存
-- **EventBridge**: 10分毎にLambdaを起動
-- **SES**: 新モデル検出時にメール送信
-
-### 前提条件
-
-- AWS CLIの設定（認証情報）
-- AWS SAM CLIのインストール
-- Node.js 20.x以降
-- 通知用のメールアドレス
-
-### 動作確認環境
-
-- Windows 10
-- PowerShell 5.1以降
-- AWS CLI 2.x
-- AWS SAM CLI 1.144.0以降
-- Node.js 20.x
-
-### クイックスタート
-
-#### デプロイ
-
-**Windows PowerShell:**
-```powershell
-.\deploy.ps1
+```
+EventBridge Scheduler（3分毎）
+        │
+        ▼
+  Lambda関数（Node.js 20）
+        ├── EC2 DescribeRegions（全AWSリージョンを動的取得）
+        ├── Bedrock ListFoundationModels（全リージョン並列実行）
+        ├── DynamoDB（差分検出）
+        └── 新モデル検出？
+              ├── あり → SESメール（英語/日本語 + ドキュメントリンク）
+              │          SNS Topic（JSON形式でSlack/Teams/Lambda連携）
+              └── なし → 終了
 ```
 
-**Linux/Mac:**
+| コンポーネント | 役割 |
+|--------------|------|
+| Lambda | 全AWSリージョンのBedrockモデルをスキャンし、DynamoDBと比較 |
+| DynamoDB | 既知のモデルをリージョン情報付きで保存 |
+| EventBridge | スケジュールでLambdaを起動（デフォルト: 3分毎） |
+| SES | ドキュメントリンク付きバイリンガルメール送信 |
+| SNS Topic | Slack/Teams/Lambda連携用の構造化JSONを発行 |
+
+### 差別化ポイント
+
+| 機能 | Bedrock Model Monitor | 一般的な代替ツール |
+|------|----------------------|------------------|
+| リージョンカバレッジ | **全AWSリージョン（動的）** | 3リージョン（固定） |
+| 検出速度 | **3分**（設定可能） | 1〜10分 |
+| 言語 | **バイリンガル（英語＋日本語）** | 単一言語 |
+| デプロイ | **ワンクリック（Launch Stack）** | CDK + bootstrap必須 |
+| 外部依存 | **なし** | Tavily APIキー等 |
+| Slack/Teams対応 | **SNS Topic同梱** | 手動設定 |
+| ドキュメントリンク | **自動付与** | なし |
+| コスト | **月額$0〜1** | 変動（AgentCoreコスト等） |
+
+### パラメータ
+
+| パラメータ | デフォルト | 説明 |
+|-----------|----------|------|
+| EmailAddress | *（必須）* | 通知先メールアドレス（SES検証は自動送信） |
+| CheckIntervalMinutes | 3 | チェック間隔（分）（1〜1440） |
+
+### SNS連携（Slack / Teams / Lambda）
+
+スタックにはSNS Topicが含まれており、新モデル検出時に構造化JSONを発行します。以下と連携可能:
+
+- **Slack**: AWS ChatbotまたはSlack Incoming Webhook + Lambda
+- **Microsoft Teams**: Teams Incoming Webhook + Lambda
+- **カスタムLambda**: JSONペイロードを処理して任意のワークフローを実行
+
+SNS Topic ARNはデプロイ後のCloudFormation Outputsで確認できます。
+
+### SAM CLIでデプロイ（代替方法）
+
 ```bash
-chmod +x deploy.sh
-./deploy.sh
+sam build && sam deploy --guided
 ```
 
-スクリプトは以下を実行します：
-1. メールアドレスの入力を求める
-2. AWS SESでメールを検証（受信トレイを確認）
-3. スタックをビルド＆デプロイ
+### 管理コマンド（PowerShell）
 
-#### 初回実行
-
-初回デプロイ時は、現在利用可能な全Bedrockモデル（約105個）がメールで届きます。
-その後は新しいモデルのみが通知されます。
-
-### 管理コマンド
-
-**メールアドレスを変更:**
-```powershell
-.\update-email.ps1
-```
-
-**即座にテスト実行（AWS上）:**
-```powershell
-.\test-now.ps1
-```
-デプロイ済みのLambda関数をAWS上で実行し、実際にメール通知を送信します。
-
-**ローカルテスト（開発用）:**
-```powershell
-.\test-local.ps1
-```
-Lambda関数のコードをデプロイせずにローカルで実行します。コード変更後のテストに便利です。
-
-**ログを確認:**
-```powershell
-aws logs tail /aws/lambda/bedrock-model-monitor-MonitorFunction --follow
-```
-
-**すべて削除:**
-```powershell
-.\destroy.ps1
-```
+| コマンド | 説明 |
+|---------|------|
+| `.\test-now.ps1` | AWS上でLambdaを実行（実際に通知送信） |
+| `.\test-local.ps1` | ローカルでLambdaを実行（開発用） |
+| `.\update-email.ps1` | 通知先メールアドレスを変更 |
+| `.\destroy.ps1` | 全AWSリソースを削除 |
 
 ### コスト見積もり
 
-- **Lambda**: 月間約4,320回実行 - 無料枠で100万リクエストまでカバー
-- **DynamoDB**: オンデマンド料金 - 小規模データセットのため最小コスト
-- **SES**: 月間62,000通まで無料
-- **EventBridge**: 月間1,400万イベントまで無料
+| サービス | 使用量 | コスト |
+|---------|-------|-------|
+| Lambda | 月間約14,400回実行（3分間隔） | 無料枠（100万リクエスト） |
+| DynamoDB | オンデマンド、小規模データ | 最小 |
+| SES | メール通知 | 無料（月間62,000通まで） |
+| SNS | Topic通知 | 無料（月間100万パブリッシュまで） |
+| EventBridge | スケジュールイベント | 無料（月間1,400万イベントまで） |
 
 **月間推定コスト: $0〜1**
-
-### メール通知の例
-
-```
-Amazon Bedrockに新しいモデルがリリースされました！
-
-検出日時: 2025-11-04 10:30:00
-新モデル数: 3
-
-【新モデル一覧】
-- GPT-4o (openai.gpt-4o-v1:0)
-  Provider: OpenAI
-  Input: TEXT
-  Output: TEXT
-  Streaming: Yes
-```
-
-### トラブルシューティング
-
-**メールが検証されない:**
-受信トレイでAWS SESからの検証メールを確認し、リンクをクリックしてください。
-
-**通知が来ない:**
-- Lambdaのログを確認
-- AWSコンソールでEventBridgeルールが有効になっているか確認
-
-**権限エラー:**
-AWS認証情報にLambda、DynamoDB、SES、EventBridge、CloudFormationの権限があることを確認してください。
 
 ### ライセンス
 
@@ -272,4 +330,4 @@ MIT
 
 ### 貢献
 
-プルリクエスト歓迎！
+プルリクエスト歓迎！ / Pull requests welcome!

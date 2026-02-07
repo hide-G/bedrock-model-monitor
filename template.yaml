@@ -1,21 +1,62 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Bedrock Model Monitor - 新モデルリリース通知システム
+Description: >
+  Bedrock Model Monitor - Detect new Amazon Bedrock foundation models across ALL AWS regions
+  and get instant bilingual (English/Japanese) email notifications with region availability.
+  Supports Slack/Teams integration via SNS Topic.
+
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: bedrock-model-monitor
+    Description: >
+      Monitor Amazon Bedrock for new foundation models across all AWS regions.
+      Bilingual notifications (EN/JP) with one-click deployment.
+    Author: hide-G
+    SpdxLicenseId: MIT
+    ReadmeUrl: README.md
+    Labels: ['bedrock', 'monitoring', 'serverless', 'generative-ai', 'notifications']
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Notification Settings / 通知設定
+        Parameters:
+          - EmailAddress
+      - Label:
+          default: Monitor Settings / 監視設定
+        Parameters:
+          - CheckIntervalMinutes
+    ParameterLabels:
+      EmailAddress:
+        default: Notification Email Address / 通知先メールアドレス
+      CheckIntervalMinutes:
+        default: Check Interval (minutes) / チェック間隔（分）
 
 Parameters:
   EmailAddress:
     Type: String
-    Description: Email address for notifications
+    Description: >
+      Email address for notifications. A verification email will be sent after deployment.
+      通知先メールアドレス。デプロイ後にSES検証メールが届きます。
+    AllowedPattern: '.+@.+\..+'
+    ConstraintDescription: Please enter a valid email address / 有効なメールアドレスを入力してください
+  CheckIntervalMinutes:
+    Type: Number
+    Default: 3
+    MinValue: 1
+    MaxValue: 1440
+    Description: >
+      How often to check for new models (minutes). Default: 3 minutes.
+      新モデルのチェック間隔（分）。デフォルト: 3分。
 
 Globals:
   Function:
-    Timeout: 60
+    Timeout: 120
     Runtime: nodejs20.x
     Architectures:
       - arm64
 
 Resources:
-  # DynamoDB: モデル一覧を保存
+  # DynamoDB: 既知モデルの保存
   ModelsTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -27,22 +68,39 @@ Resources:
       KeySchema:
         - AttributeName: modelId
           KeyType: HASH
-      StreamSpecification:
-        StreamViewType: NEW_AND_OLD_IMAGES
 
-  # Lambda関数
+  # SNS Topic: Slack/Teams/Lambda連携用
+  NotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub ${AWS::StackName}-notifications
+      DisplayName: Bedrock Model Monitor Notifications
+
+  # SNS Email Subscription: メールアドレスへの通知（SNS経由）
+  EmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref NotificationTopic
+      Protocol: email
+      Endpoint: !Ref EmailAddress
+
+  # Lambda関数: Bedrockモデル監視（メイン）
   MonitorFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: lambda/
       Handler: index.handler
+      MemorySize: 256
       Environment:
         Variables:
           TABLE_NAME: !Ref ModelsTable
           EMAIL_ADDRESS: !Ref EmailAddress
+          SNS_TOPIC_ARN: !Ref NotificationTopic
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref ModelsTable
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt NotificationTopic.TopicName
         - Statement:
             - Effect: Allow
               Action:
@@ -52,20 +110,60 @@ Resources:
               Action:
                 - ses:SendEmail
               Resource: '*'
+            - Effect: Allow
+              Action:
+                - ec2:DescribeRegions
+              Resource: '*'
       Events:
         ScheduleEvent:
           Type: Schedule
           Properties:
-            Schedule: rate(10 minutes)
-            Description: 10分毎にBedrockモデルをチェック
+            Schedule: !Sub rate(${CheckIntervalMinutes} minutes)
+            Description: Check Bedrock models on schedule
+
+  # SESメール検証用カスタムリソース
+  SesVerificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/
+      Handler: ses-verify.handler
+      Runtime: nodejs20.x
+      Timeout: 30
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ses:VerifyEmailIdentity
+                - ses:DeleteIdentity
+              Resource: '*'
+
+  SesEmailVerification:
+    Type: Custom::SesEmailVerification
+    Properties:
+      ServiceToken: !GetAtt SesVerificationFunction.Arn
+      EmailAddress: !Ref EmailAddress
 
 Outputs:
   FunctionName:
-    Description: Lambda関数名
+    Description: Lambda Function Name
     Value: !Ref MonitorFunction
   TableName:
-    Description: DynamoDBテーブル名
+    Description: DynamoDB Table Name
     Value: !Ref ModelsTable
+  SnsTopicArn:
+    Description: >
+      SNS Topic ARN - Subscribe Slack/Teams/Lambda to this topic for additional integrations.
+      SNS Topic ARN - Slack/Teams/Lambda連携用。このTopicにサブスクリプションを追加してください。
+    Value: !Ref NotificationTopic
   EmailAddress:
-    Description: 通知先メールアドレス
+    Description: Notification Email Address
     Value: !Ref EmailAddress
+  CheckInterval:
+    Description: Check Interval (minutes)
+    Value: !Ref CheckIntervalMinutes
+  SetupNote:
+    Description: Important setup information / セットアップ情報
+    Value: !Sub >
+      Two verification steps required: 1) Click the SES verification link sent to ${EmailAddress}.
+      2) Click the SNS subscription confirmation link sent to ${EmailAddress}.
+      2つの検証が必要です: 1) SES検証メールのリンクをクリック 2) SNSサブスクリプション確認メールのリンクをクリック

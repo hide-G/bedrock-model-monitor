@@ -1,69 +1,63 @@
 #!/bin/bash
 
-# Bedrock Model Monitor Deploy Script
+# Bedrock Model Monitor デプロイスクリプト
 
 echo "=== Bedrock Model Monitor Deploy ==="
 
-# Prompt for email address
-read -p "Enter your email address for notifications: " EMAIL_ADDRESS
+# メールアドレスの入力
+read -p "通知先メールアドレスを入力してください / Enter your email address: " EMAIL_ADDRESS
 
 if [ -z "$EMAIL_ADDRESS" ]; then
-    echo "Error: Email address is required"
+    echo "エラー: メールアドレスは必須です"
     exit 1
 fi
 
-# Validate email format
-if ! [[ "$EMAIL_ADDRESS" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
-    echo "Error: Invalid email format"
+# メールアドレスの形式チェック
+if ! [[ "$EMAIL_ADDRESS" =~ ^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$ ]]; then
+    echo "エラー: 無効なメールアドレス形式です"
     exit 1
 fi
 
 echo ""
-echo "Email address: $EMAIL_ADDRESS"
+echo "メールアドレス: $EMAIL_ADDRESS"
 
-# Check SES email verification
-echo "Checking SES email verification..."
-EMAIL_STATUS=$(aws ses get-identity-verification-attributes --identities "$EMAIL_ADDRESS" --query "VerificationAttributes.\"$EMAIL_ADDRESS\".VerificationStatus" --output text 2>/dev/null)
-
-if [ "$EMAIL_STATUS" != "Success" ]; then
-    echo "Email not verified. Sending verification email..."
-    aws ses verify-email-identity --email-address "$EMAIL_ADDRESS"
-    echo "Verification email sent to $EMAIL_ADDRESS"
-    echo "Please check your inbox and click the verification link"
-    echo "Then run this script again"
-    exit 1
-fi
-
-echo "Email verified"
-
-# Install Lambda dependencies
+# Lambda依存関係のインストール
 echo ""
-echo "Installing Lambda dependencies..."
+echo "Lambda依存関係をインストール中..."
 cd lambda
 npm install
 cd ..
 
-# SAM Build
+# SAMビルド
 echo ""
-echo "Running SAM build..."
+echo "SAMビルド実行中..."
 sam build
 
 if [ $? -ne 0 ]; then
-    echo "Build failed"
+    echo "ビルドに失敗しました"
     exit 1
 fi
 
-# SAM Deploy
+# SAMデプロイ
 echo ""
-echo "Running SAM deploy..."
-sam deploy --stack-name bedrock-model-monitor --capabilities CAPABILITY_IAM --resolve-s3 --parameter-overrides EmailAddress="$EMAIL_ADDRESS"
+echo "SAMデプロイ実行中..."
+sam deploy \
+    --stack-name bedrock-model-monitor \
+    --capabilities CAPABILITY_IAM \
+    --resolve-s3 \
+    --parameter-overrides EmailAddress="$EMAIL_ADDRESS"
 
 if [ $? -ne 0 ]; then
-    echo "Deploy failed"
+    echo "デプロイに失敗しました"
     exit 1
 fi
 
 echo ""
-echo "Deploy completed!"
-echo "The system will check Bedrock models every 10 minutes"
-echo "Check logs: aws logs tail /aws/lambda/bedrock-model-monitor-MonitorFunction --follow"
+echo "=== デプロイ完了！ ==="
+echo ""
+echo "重要: $EMAIL_ADDRESS にSES検証メールが届きます。"
+echo "受信トレイを確認し、検証リンクをクリックしてください。"
+echo "検証が完了するまでメール通知は送信されません。"
+echo ""
+echo "システムは10分毎にBedrockモデルをチェックします"
+echo "ログ確認: aws logs tail /aws/lambda/bedrock-model-monitor-MonitorFunction --follow"

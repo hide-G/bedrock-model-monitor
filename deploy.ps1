@@ -1,63 +1,56 @@
-# Bedrock Model Monitor Deploy Script
+# Bedrock Model Monitor デプロイスクリプト
 
 Write-Host "=== Bedrock Model Monitor Deploy ===" -ForegroundColor Green
 
-# Prompt for email address
-$emailAddress = Read-Host "Enter your email address for notifications"
+# メールアドレスの入力
+$emailAddress = Read-Host "通知先メールアドレスを入力してください / Enter your email address for notifications"
 
 if ([string]::IsNullOrWhiteSpace($emailAddress)) {
-    Write-Host "Error: Email address is required" -ForegroundColor Red
+    Write-Host "エラー: メールアドレスは必須です" -ForegroundColor Red
     exit 1
 }
 
-# Validate email format
-if ($emailAddress -notmatch '^[\w\.-]+@[\w\.-]+\.\w+$') {
-    Write-Host "Error: Invalid email format" -ForegroundColor Red
+# メールアドレスの形式チェック
+if ($emailAddress -notmatch '^[\w\.\+\-]+@[\w\.\-]+\.\w+$') {
+    Write-Host "エラー: 無効なメールアドレス形式です" -ForegroundColor Red
     exit 1
 }
 
-Write-Host "`nEmail address: $emailAddress" -ForegroundColor Cyan
+Write-Host "`nメールアドレス: $emailAddress" -ForegroundColor Cyan
 
-# Check SES email verification
-Write-Host "Checking SES email verification..." -ForegroundColor Cyan
-$emailStatusJson = aws ses get-identity-verification-attributes --identities $emailAddress 2>$null | ConvertFrom-Json
-$emailStatus = $emailStatusJson.VerificationAttributes.$emailAddress.VerificationStatus
-
-if ($emailStatus -ne "Success") {
-    Write-Host "Email not verified. Sending verification email..." -ForegroundColor Yellow
-    aws ses verify-email-identity --email-address $emailAddress
-    Write-Host "Verification email sent to $emailAddress" -ForegroundColor Yellow
-    Write-Host "Please check your inbox and click the verification link" -ForegroundColor Yellow
-    Write-Host "Then run this script again" -ForegroundColor Yellow
-    exit 1
-}
-
-Write-Host "Email verified" -ForegroundColor Green
-
-# Install Lambda dependencies
-Write-Host "Installing Lambda dependencies..." -ForegroundColor Cyan
+# Lambda依存関係のインストール
+Write-Host "`nLambda依存関係をインストール中..." -ForegroundColor Cyan
 Push-Location lambda
 npm install
 Pop-Location
 
-# SAM Build
-Write-Host "Running SAM build..." -ForegroundColor Cyan
+# SAMビルド
+Write-Host "`nSAMビルド実行中..." -ForegroundColor Cyan
 sam build
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "Build failed" -ForegroundColor Red
+    Write-Host "ビルドに失敗しました" -ForegroundColor Red
     exit 1
 }
 
-# SAM Deploy
-Write-Host "Running SAM deploy..." -ForegroundColor Cyan
-sam deploy --stack-name bedrock-model-monitor --capabilities CAPABILITY_IAM --resolve-s3 --parameter-overrides EmailAddress=$emailAddress
+# SAMデプロイ
+Write-Host "`nSAMデプロイ実行中..." -ForegroundColor Cyan
+sam deploy `
+    --stack-name bedrock-model-monitor `
+    --capabilities CAPABILITY_IAM `
+    --resolve-s3 `
+    --parameter-overrides EmailAddress=$emailAddress
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "Deploy failed" -ForegroundColor Red
+    Write-Host "デプロイに失敗しました" -ForegroundColor Red
     exit 1
 }
 
-Write-Host "Deploy completed!" -ForegroundColor Green
-Write-Host "The system will check Bedrock models every 10 minutes" -ForegroundColor Green
-Write-Host "Check logs: aws logs tail /aws/lambda/bedrock-model-monitor-MonitorFunction --follow" -ForegroundColor Cyan
+Write-Host "`n=== デプロイ完了！ ===" -ForegroundColor Green
+Write-Host ""
+Write-Host "重要: $emailAddress にSES検証メールが届きます。" -ForegroundColor Yellow
+Write-Host "受信トレイを確認し、検証リンクをクリックしてください。" -ForegroundColor Yellow
+Write-Host "検証が完了するまでメール通知は送信されません。" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "システムは ${CheckIntervalMinutes:-10} 分毎にBedrockモデルをチェックします" -ForegroundColor Green
+Write-Host "ログ確認: aws logs tail /aws/lambda/bedrock-model-monitor-MonitorFunction --follow" -ForegroundColor Cyan

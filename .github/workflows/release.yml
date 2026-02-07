@@ -1,0 +1,62 @@
+name: Release - SAMテンプレートをS3にパッケージ
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  # Launch Stack用テンプレートを格納するS3バケット
+  # リポジトリのSecretsに TEMPLATE_BUCKET_NAME を設定してください
+  TEMPLATE_BUCKET: ${{ secrets.TEMPLATE_BUCKET_NAME }}
+  AWS_REGION: us-east-1
+
+jobs:
+  package-and-upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: aws-actions/setup-sam@v2
+
+      # OIDC認証を使用（推奨）
+      # リポジトリのSecretsに AWS_ROLE_ARN を設定してください
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Lambda依存関係のインストール
+        run: npm install
+        working-directory: lambda
+
+      - name: SAMビルド
+        run: sam build
+
+      - name: SAMパッケージ（S3にアップロード）
+        run: |
+          sam package \
+            --output-template-file packaged.yaml \
+            --s3-bucket ${{ env.TEMPLATE_BUCKET }} \
+            --s3-prefix bedrock-model-monitor
+
+      - name: パッケージ済みテンプレートをS3にアップロード
+        run: |
+          aws s3 cp packaged.yaml \
+            s3://${{ env.TEMPLATE_BUCKET }}/bedrock-model-monitor/template.yaml
+
+      - name: Launch Stack URLの表示
+        run: |
+          TEMPLATE_URL="https://${{ env.TEMPLATE_BUCKET }}.s3.amazonaws.com/bedrock-model-monitor/template.yaml"
+          LAUNCH_URL="https://console.aws.amazon.com/cloudformation/home#/stacks/new?stackName=bedrock-model-monitor&templateURL=${TEMPLATE_URL}"
+          echo "Template URL: ${TEMPLATE_URL}"
+          echo "Launch Stack URL: ${LAUNCH_URL}"
