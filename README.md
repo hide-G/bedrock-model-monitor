@@ -48,18 +48,16 @@ EventBridge Scheduler (every 3 min)
 | SES | Sends bilingual email notifications with documentation links |
 | SNS Topic | Publishes structured JSON for Slack/Teams/Lambda integrations |
 
-### Key Differentiators
+### Features
 
-| Feature | Bedrock Model Monitor | Typical Alternatives |
-|---------|----------------------|---------------------|
-| Region Coverage | **All AWS regions (dynamic)** | 3 regions (hardcoded) |
-| Detection Speed | **3 minutes** (configurable) | 1-10 minutes |
-| Language | **Bilingual (EN + JP)** | Single language |
-| Deployment | **One-click (Launch Stack)** | CDK + bootstrap required |
-| External Dependencies | **None** | Tavily API key, etc. |
-| Slack/Teams Ready | **SNS Topic included** | Manual setup |
-| Documentation Links | **Auto-included** | Not included |
-| Cost | **$0-1/month** | Varies (AgentCore costs) |
+- 🌍 **All AWS regions** scanned dynamically (no hardcoded list)
+- ⚡ **3-minute detection** (configurable interval)
+- 🌐 **Bilingual notifications** (English + Japanese)
+- 🚀 **One-click deployment** via Launch Stack
+- 🔗 **Documentation & console links** auto-included
+- 📡 **SNS Topic included** for Slack/Teams/Lambda integrations
+- 🔓 **No external dependencies** — runs entirely on AWS
+- 💰 **$0-1/month** — mostly free tier eligible
 
 ### Email Notification Example
 
@@ -267,18 +265,16 @@ EventBridge Scheduler（3分毎）
 | SES | ドキュメントリンク付きバイリンガルメール送信 |
 | SNS Topic | Slack/Teams/Lambda連携用の構造化JSONを発行 |
 
-### 差別化ポイント
+### 特徴
 
-| 機能 | Bedrock Model Monitor | 一般的な代替ツール |
-|------|----------------------|------------------|
-| リージョンカバレッジ | **全AWSリージョン（動的）** | 3リージョン（固定） |
-| 検出速度 | **3分**（設定可能） | 1〜10分 |
-| 言語 | **バイリンガル（英語＋日本語）** | 単一言語 |
-| デプロイ | **ワンクリック（Launch Stack）** | CDK + bootstrap必須 |
-| 外部依存 | **なし** | Tavily APIキー等 |
-| Slack/Teams対応 | **SNS Topic同梱** | 手動設定 |
-| ドキュメントリンク | **自動付与** | なし |
-| コスト | **月額$0〜1** | 変動（AgentCoreコスト等） |
+- 🌍 **全AWSリージョンを動的スキャン**（ハードコードなし）
+- ⚡ **3分で検出**（間隔は設定可能）
+- 🌐 **バイリンガル通知**（英語＋日本語）
+- 🚀 **ワンクリックデプロイ**（Launch Stack対応）
+- 🔗 **ドキュメント・コンソールリンク自動付与**
+- 📡 **SNS Topic同梱**（Slack/Teams/Lambda連携）
+- 🔓 **外部依存なし** — AWS上で完結
+- 💰 **月額$0〜1** — ほぼ無料枠内で運用可能
 
 ### パラメータ
 
