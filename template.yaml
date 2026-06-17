@@ -108,9 +108,9 @@ Resources:
               Resource: '*'
             - Effect: Allow
               Action:
-                - bedrock:InvokeModel
-                - bedrock:ListModels
-                - bedrock:GetFoundationModel
+                - bedrock-mantle:InvokeModel
+                - bedrock-mantle:ListModels
+                - bedrock-mantle:GetModel
               Resource: '*'
             - Effect: Allow
               Action:
