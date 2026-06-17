@@ -188,7 +188,7 @@ async function signedHttpRequest(region, method, hostname, path) {
   const signer = new SignatureV4({
     credentials: creds,
     region,
-    service: 'bedrock',
+    service: 'bedrock-mantle',
     sha256: Sha256,
   });
 
