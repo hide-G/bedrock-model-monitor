@@ -108,6 +108,12 @@ Resources:
               Resource: '*'
             - Effect: Allow
               Action:
+                - bedrock:InvokeModel
+                - bedrock:ListModels
+                - bedrock:GetFoundationModel
+              Resource: '*'
+            - Effect: Allow
+              Action:
                 - ses:SendEmail
               Resource: '*'
             - Effect: Allow
